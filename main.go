@@ -118,7 +118,7 @@ func main() {
 
     // Measure parallel processing time
     parallelTime := measureTime(func() *image.Gray {
-        return medianFilterParallel(bwImage, 10) // Adjust the chunkSize value as needed
+        return medianFilterParallel(bwImage, 45) // Adjust the chunkSize value as needed
     })
 
     // Plotting the results
