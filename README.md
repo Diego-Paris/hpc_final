@@ -22,7 +22,7 @@ cd path/to/project
 ## Setting up dependencies
 This project requires the Gonum Plot package for creating plots. Install it by running:
 ```bash
-go get -u gonum.org/v1/plot/...
+go install
 ```
 
 ## Running the script
