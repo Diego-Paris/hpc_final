@@ -61,27 +61,32 @@ func medianFilterSequential(img *image.Gray) *image.Gray {
 }
 
 // Median Filter (Parallel)
-func medianFilterParallel(img *image.Gray) *image.Gray {
+func medianFilterParallel(img *image.Gray, chunkSize int) *image.Gray {
     bounds := img.Bounds()
     output := image.NewGray(bounds)
     filterSize := 1 // You can adjust this size
     var wg sync.WaitGroup
 
-    for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-        for x := bounds.Min.X; x < bounds.Max.X; x++ {
+    for y := bounds.Min.Y; y < bounds.Max.Y; y += chunkSize {
+        for x := bounds.Min.X; x < bounds.Max.X; x += chunkSize {
             wg.Add(1)
             go func(x, y int) {
                 defer wg.Done()
-                neighborhood := getNeighborhood(img, x, y, filterSize)
-                sort.Slice(neighborhood, func(i, j int) bool { return neighborhood[i] < neighborhood[j] })
-                median := neighborhood[len(neighborhood)/2]
-                output.SetGray(x, y, color.Gray{Y: median})
+                for cy := y; cy < y+chunkSize && cy < bounds.Max.Y; cy++ {
+                    for cx := x; cx < x+chunkSize && cx < bounds.Max.X; cx++ {
+                        neighborhood := getNeighborhood(img, cx, cy, filterSize)
+                        sort.Slice(neighborhood, func(i, j int) bool { return neighborhood[i] < neighborhood[j] })
+                        median := neighborhood[len(neighborhood)/2]
+                        output.SetGray(cx, cy, color.Gray{Y: median})
+                    }
+                }
             }(x, y)
         }
     }
     wg.Wait()
     return output
 }
+
 
 // Measure the execution time
 func measureTime(function func() *image.Gray) time.Duration {
@@ -93,7 +98,7 @@ func measureTime(function func() *image.Gray) time.Duration {
 // Main function
 func main() {
     // Load the image
-    inFile, err := os.Open("dataset/kodim04.png")
+    inFile, err := os.Open("dataset/kodim21.png")
     if err != nil {
         log.Fatalf("failed to open: %v", err)
     }
@@ -113,7 +118,7 @@ func main() {
 
     // Measure parallel processing time
     parallelTime := measureTime(func() *image.Gray {
-        return medianFilterParallel(bwImage)
+        return medianFilterParallel(bwImage, 10) // Adjust the chunkSize value as needed
     })
 
     // Plotting the results
