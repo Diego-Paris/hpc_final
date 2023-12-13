@@ -1,18 +1,20 @@
 package main
 
 import (
-	"fmt"
-	"image"
-	"image/color"
-	"log"
-	"os"
-	"sort"
-	"sync"
-	"time"
+    "fmt"
+    "image"
+    "image/color"
+    "image/png"
+    "log"
+    "os"
+    "path/filepath"
+    "sort"
+    "sync"
+    "time"
 
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
+    "gonum.org/v1/plot"
+    "gonum.org/v1/plot/plotter"
+    "gonum.org/v1/plot/vg"
 )
 
 // Convert to Black and White
@@ -88,12 +90,29 @@ func medianFilterParallel(img *image.Gray, chunkSize int) *image.Gray {
     return output
 }
 
-
 // Measure the execution time
 func measureTime(function func() *image.Gray) time.Duration {
     start := time.Now()
     function()
     return time.Since(start)
+}
+
+func saveImage(img image.Image, folder, filename string) {
+    // Check if the directory exists, if not create it
+    if _, err := os.Stat(folder); os.IsNotExist(err) {
+        os.Mkdir(folder, os.ModePerm)
+    }
+
+    // Save the image
+    outFile, err := os.Create(filepath.Join(folder, filename))
+    if err != nil {
+        log.Fatalf("failed to create file: %v", err)
+    }
+    defer outFile.Close()
+
+    if err := png.Encode(outFile, img); err != nil {
+        log.Fatalf("failed to encode image: %v", err)
+    }
 }
 
 func main() {
@@ -106,8 +125,8 @@ func main() {
     parallelPoints := make(plotter.XYs, 24)
 
     for i := 1; i <= 24; i++ {
-        filename := fmt.Sprintf("dataset/kodim%02d.png", i)
-        inFile, err := os.Open(filename)
+        filename := fmt.Sprintf("kodim%02d.png", i)
+        inFile, err := os.Open(filepath.Join("dataset", filename))
         if err != nil {
             log.Fatalf("failed to open %s: %v", filename, err)
         }
@@ -120,15 +139,22 @@ func main() {
 
         bwImage := toBlackAndWhite(img)
 
+        // Save black and white image with noise
+        saveImage(bwImage, "dataset-w-noise", filename)
+
         // Measure sequential processing time
         seqTime := measureTime(func() *image.Gray {
             return medianFilterSequential(bwImage)
         })
+        sequentialOutput := medianFilterSequential(bwImage)
+        saveImage(sequentialOutput, "dataset-output", fmt.Sprintf("sequential-%s", filename))
 
         // Measure parallel processing time
         parallelTime := measureTime(func() *image.Gray {
             return medianFilterParallel(bwImage, 45) // Adjust the chunkSize value as needed
         })
+        parallelOutput := medianFilterParallel(bwImage, 45) // Adjust the chunkSize
+        saveImage(parallelOutput, "dataset-output", fmt.Sprintf("parallel-%s", filename))
 
         sequentialPoints[i-1] = plotter.XY{X: float64(i), Y: seqTime.Seconds()}
         parallelPoints[i-1] = plotter.XY{X: float64(i), Y: parallelTime.Seconds()}
@@ -146,10 +172,11 @@ func main() {
     }
     parLine.Color = color.RGBA{R: 0, G: 0, B: 255, A: 255} // Blue line for parallel
 
-    // Adjust the legend position and padding
-    p.Legend.Top = true // Move the legend to the top of the plot
-    p.Legend.Left = true // Align the legend to the left
-    p.Legend.Padding = vg.Points(10)
+    // Adjust the legend position
+    p.Legend.Top = false
+    p.Legend.Left = false
+    p.Legend.XOffs = vg.Points(-500) // You can adjust this for fine positioning
+    p.Legend.YOffs = vg.Points(-30) // You can adjust this for fine positioning
 
     // Add the lines and points to the plot
     p.Add(seqLine, seqPoints)
