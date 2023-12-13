@@ -1,17 +1,18 @@
 package main
 
 import (
-    "image"
-    "image/color"
-    "log"
-    "os"
-    "sort"
-    "sync"
-    "time"
+	"fmt"
+	"image"
+	"image/color"
+	"log"
+	"os"
+	"sort"
+	"sync"
+	"time"
 
-    "gonum.org/v1/plot"
-    "gonum.org/v1/plot/plotter"
-    "gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
 )
 
 // Convert to Black and White
@@ -95,60 +96,62 @@ func measureTime(function func() *image.Gray) time.Duration {
     return time.Since(start)
 }
 
-// Main function
 func main() {
-    // Load the image
-    inFile, err := os.Open("dataset/kodim21.png")
-    if err != nil {
-        log.Fatalf("failed to open: %v", err)
-    }
-    defer inFile.Close()
-    img, _, err := image.Decode(inFile)
-    if err != nil {
-        log.Fatalf("failed to decode: %v", err)
-    }
-
-    // Convert to black and white
-    bwImage := toBlackAndWhite(img)
-
-    // Measure sequential processing time
-    seqTime := measureTime(func() *image.Gray {
-        return medianFilterSequential(bwImage)
-    })
-
-    // Measure parallel processing time
-    parallelTime := measureTime(func() *image.Gray {
-        return medianFilterParallel(bwImage, 45) // Adjust the chunkSize value as needed
-    })
-
-    // Plotting the results
     p := plot.New()
-    // if err != nil {
-    //     log.Fatalf("failed to create plot: %v", err)
-    // }
-
     p.Title.Text = "Performance Comparison"
-    p.X.Label.Text = "Method"
+    p.X.Label.Text = "Image Number"
     p.Y.Label.Text = "Time (s)"
 
-    // Prepare data for the bar chart
-    values := make(plotter.Values, 2)
-    values[0] = seqTime.Seconds()
-    values[1] = parallelTime.Seconds()
+    sequentialPoints := make(plotter.XYs, 24)
+    parallelPoints := make(plotter.XYs, 24)
 
-    // Create bar chart
-    bars, err := plotter.NewBarChart(values, vg.Points(20))
-    if err != nil {
-        log.Fatalf("failed to create bar chart: %v", err)
+    for i := 1; i <= 24; i++ {
+        filename := fmt.Sprintf("dataset/kodim%02d.png", i)
+        inFile, err := os.Open(filename)
+        if err != nil {
+            log.Fatalf("failed to open %s: %v", filename, err)
+        }
+
+        img, _, err := image.Decode(inFile)
+        inFile.Close()
+        if err != nil {
+            log.Fatalf("failed to decode %s: %v", filename, err)
+        }
+
+        bwImage := toBlackAndWhite(img)
+
+        // Measure sequential processing time
+        seqTime := measureTime(func() *image.Gray {
+            return medianFilterSequential(bwImage)
+        })
+
+        // Measure parallel processing time
+        parallelTime := measureTime(func() *image.Gray {
+            return medianFilterParallel(bwImage, 45) // Adjust the chunkSize value as needed
+        })
+
+        sequentialPoints[i-1] = plotter.XY{X: float64(i), Y: seqTime.Seconds()}
+        parallelPoints[i-1] = plotter.XY{X: float64(i), Y: parallelTime.Seconds()}
     }
 
-    p.Add(bars)
-    p.NominalX("Sequential", "Parallel")
+    seqLine, seqPoints, err := plotter.NewLinePoints(sequentialPoints)
+    if err != nil {
+        log.Fatalf("failed to create line points for sequential: %v", err)
+    }
+    seqLine.Color = color.RGBA{R: 255, G: 0, B: 0, A: 255} // Red line for sequential
+    p.Add(seqLine, seqPoints)
 
-    if err := p.Save(4*vg.Inch, 4*vg.Inch, "performance.png"); err != nil {
+    parLine, parPoints, err := plotter.NewLinePoints(parallelPoints)
+    if err != nil {
+        log.Fatalf("failed to create line points for parallel: %v", err)
+    }
+    parLine.Color = color.RGBA{R: 0, G: 0, B: 255, A: 255} // Blue line for parallel
+    p.Add(parLine, parPoints)
+
+    p.Legend.Add("Sequential", seqLine, seqPoints)
+    p.Legend.Add("Parallel", parLine, parPoints)
+
+    if err := p.Save(8*vg.Inch, 4*vg.Inch, "performance_comparison.png"); err != nil {
         log.Fatalf("failed to save plot: %v", err)
     }
-
-    // Optionally, save the processed images
-    // ...
 }
