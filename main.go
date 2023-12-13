@@ -139,18 +139,27 @@ func main() {
         log.Fatalf("failed to create line points for sequential: %v", err)
     }
     seqLine.Color = color.RGBA{R: 255, G: 0, B: 0, A: 255} // Red line for sequential
-    p.Add(seqLine, seqPoints)
 
     parLine, parPoints, err := plotter.NewLinePoints(parallelPoints)
     if err != nil {
         log.Fatalf("failed to create line points for parallel: %v", err)
     }
     parLine.Color = color.RGBA{R: 0, G: 0, B: 255, A: 255} // Blue line for parallel
+
+    // Adjust the legend position and padding
+    p.Legend.Top = true // Move the legend to the top of the plot
+    p.Legend.Left = true // Align the legend to the left
+    p.Legend.Padding = vg.Points(10)
+
+    // Add the lines and points to the plot
+    p.Add(seqLine, seqPoints)
     p.Add(parLine, parPoints)
 
+    // Add legend entries
     p.Legend.Add("Sequential", seqLine, seqPoints)
     p.Legend.Add("Parallel", parLine, parPoints)
 
+    // Save the plot
     if err := p.Save(8*vg.Inch, 4*vg.Inch, "performance_comparison.png"); err != nil {
         log.Fatalf("failed to save plot: %v", err)
     }
