@@ -133,6 +133,7 @@ func saveImage(img image.Image, folder, filename string) {
 }
 
 func main() {
+	fmt.Println("Running Median Filter, please wait...")
 	p := plot.New()
 	p.Title.Text = "Performance Comparison"
 	p.X.Label.Text = "Image Number"
